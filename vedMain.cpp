@@ -461,6 +461,12 @@ int KeysGetandImport(char * vmName)
     // first connect keyserver
     int ret = 0;
     int key = 0;
+    VedInstance * ved = vedManager.GetInstance(vmName);
+    if(ved == NULL)
+    {
+        printf("vmName %s not allocate vedcard\n", vmName);
+        return -1;
+    }
     sockfd = init_tcp_connect(keyServer, keyServerPort);
     printf("%s: sockfd:%d\n", __func__, sockfd);
     ret = AuthCertSend(sockfd);
@@ -487,7 +493,7 @@ int KeysGetandImport(char * vmName)
     }
     ret = key_pair_recv(sockfd, &key, dh.len);
     printf("key:%d\n",key);
-    VedInstance * ved = vedManager.GetInstance(vmName);
+    
     ret = ved->ImportKeys(key, key);
     if(ret != 0)
     {

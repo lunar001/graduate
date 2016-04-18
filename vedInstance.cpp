@@ -150,7 +150,7 @@ int VedInstance::ImportKeys(const int keys, const int keyNo)
         printf("%s,ioctl error\n", __func__ );
         return -1;
    }
-   if(key.retcode == 0)
+   if(key.retcode = 0)
    {
         printf("import keys error\n");
         return -1;
