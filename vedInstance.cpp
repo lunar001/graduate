@@ -150,7 +150,7 @@ int VedInstance::ImportKeys(const int keys, const int keyNo)
         printf("%s,ioctl error\n", __func__ );
         return -1;
    }
-   if(key.retcode = 0)
+   if(key.retcode != 0)
    {
         printf("import keys error\n");
         return -1;
@@ -163,13 +163,13 @@ int VedInstance::StoreLocalBuf(struct scale * localbuf)
     int ret = -1;
     printf("%s\n",__func__);
     // first susspend edcard
-    ret = ioctl(devicefd, MIGRATEBEGINF, NULL);
+    ret = ioctl(devicefd, MIGRATEBEGINF, localbuf);
     if(ret < 0)
     {
         printf("%s:ioctl error\n", __func__);
         return -1;
     }
-    ret = ioctl(devicefd, MIGRATE_EXPORT, &localbuf); 
+    ret = ioctl(devicefd, MIGRATE_EXPORT, localbuf); 
     if(ret < 0 || localbuf->retcode != 0)
     {
         printf("export local error\n");
@@ -189,7 +189,7 @@ int VedInstance::LoadLocalBuf(struct scale * localbuf)
         printf("import local error\n");
         return -1;
     }
-    ret = ioctl(devicefd, MIGRATE_END, NULL);
+    ret = ioctl(devicefd, MIGRATE_END, localbuf);
     if(ret < 0)
     {
         printf("resume edcard error\n");

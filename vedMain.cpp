@@ -48,6 +48,7 @@
 #define MIGRATE_LOCAL_FAILED  0X10100009
 #define MIGRATE_FIN_SUCCESS   0X10100010
 #define MIGRATE_FIN_FAILED    0X10100011
+#define MIGRATE_VMNAME        0X10100012
 
 #define VERIFY          0X10200001
 #define VERIFY_SUCCESS  0X10200002
@@ -148,7 +149,7 @@ int key_pair_recv(int sockfd,void * buf,int len)
 				}
 				else
 				{
-					printf("error happend\n");
+					printf("error happend %s\n", strerror(errno));
 					return -1;
 				}
 			}
@@ -551,6 +552,24 @@ int migrated_fuc(void * arg)
         return -1 ;
     
     }
+    
+    memset(&dh, 0, sizeof(dh));
+    ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
+    if(dh.cmd != MIGRATE_VMNAME)
+    {
+        printf("recv error segment\n");
+        close(ved->migratefd);
+        return -1 ;
+    
+    }
+    char buf[20] = {'\0'};
+    printf("recv name %d\n",dh.len);
+    ret = key_pair_recv(ved->migratedfd, buf, dh.len);
+    printf("buf:%s %d\n",buf,dh.len);
+    ved->Initialize("/dev/swcsm-pci09-0", buf);
+    ved->Start();
+    vedManager.Insert(ved->vmName, ved);
+    //ved->Start();
     memset(&dh, 0, sizeof(dh));
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != MIGID_SYN)
@@ -668,6 +687,14 @@ int migrate_func(void * arg)
         return 0;
     }
     printf("%s:auth successfully dp\n",__func__);
+    dh.cmd = MIGRATE_VMNAME;
+    dh.len = ved->vmName.size();
+    char vmName[20] = {'\0'};
+    memcpy(vmName, ved->vmName.c_str(), ved->vmName.size());
+    printf("%s, len:%d\n",vmName, strlen(vmName));
+    ret = key_pair_send(ved->migratefd, &dh, sizeof(dh));
+    ret = key_pair_send(ved->migratefd, vmName, dh.len);
+    
     ved->migId = 171;
     dh.cmd = MIGID_SYN;
     dh.len = sizeof(ved->migId);
