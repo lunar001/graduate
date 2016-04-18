@@ -19,7 +19,7 @@ main(int argc, char **argv)
     sem_t * sem1;
     sem_t * sem2;
     char * sbuf;
-    char buf[] = "good morning";
+    char buf[] = "good morning, hello world";
     char bufp[100] = {'\0'};
     int oflag = SVSHM_MODE ;
     int id = shmget(ftok(argv[1], 0), 100, oflag);

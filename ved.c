@@ -87,6 +87,25 @@ main(int argc, char * argv[])
             printf("create ved success\n");       
         }
     }
+    else if(strcmp(cmd, "destroy") == 0)
+    {
+        printf("argc:%d\n", argc);
+        if(argc != 3)
+        {
+            printf("ved destory vmname\n");
+            return -1;
+        }
+        memset(&command, 0, sizeof(command));
+        command.cmd = DESTROYVED;
+        strcpy(command.vmName, argv[2]);
+        ret = sendto(sockfd, &command, sizeof(command), 0, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+        printf("ret = %d\n", ret);
+        ret = recvfrom(sockfd, &command, sizeof(command), 0, (struct sockaddr *)&serveraddr, &len);
+        if(command.cmd != ACTOK)
+        {
+            printf("destroy ved error\n");
+        }
+    }
     else if(strcmp(cmd, "importkey") == 0)
     {
        

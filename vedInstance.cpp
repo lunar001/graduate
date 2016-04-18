@@ -100,15 +100,14 @@ void VedInstance::ThreadFunc()
     while(true)
     {
         printf("begin to wait\n");
-        getchar();
         sem_wait(sem1);
         if(stop == 1)
         {
             printf("stop recv\n");
             return ;
         }
-        getchar();
-        printf("%s\n", sbuf); 
+        m = write(devicefd, sbuf, BUFFLENGTH);
+        m = read(devicefd, sbuf, BUFFLENGTH);
         sem_post(sem2);
     }
     return ;
@@ -116,6 +115,12 @@ void VedInstance::ThreadFunc()
 void VedInstance::Start()
 {
     // start a new edthread
+    devicefd = open(edCard.c_str(), O_RDWR, 0);
+    if(devicefd == -1)
+    {
+        printf("open device error\n");
+        return ;
+    }
     edthread = new thread(bind(&VedInstance::ThreadFunc, this));
     return ;
 }
@@ -126,6 +131,7 @@ void VedInstance::Stop()
     stop = 1;
     sem_post(sem1);
     edthread->join();
+    close(devicefd);
     delete edthread;
 }
 int VedInstance::ImportKeys(const int keys, const int keyNo)

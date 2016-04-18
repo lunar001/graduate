@@ -876,7 +876,7 @@ main()
     int ret = 0;
     struct Command cmd;
     struct sockaddr_un cliaddr;
-    socklen_t clilen;
+    socklen_t clilen = sizeof(cliaddr);
     int epollfd = 0;
     struct epoll_event events[MAX_EPOLL_EVENT];
 	struct epoll_event event;
@@ -919,7 +919,7 @@ main()
                 memset(&cliaddr, 0, sizeof(cliaddr));
                 memset(&cmd, 0, sizeof(cmd));
                 ret = recvfrom(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, &clilen);
-                printf("%d, %s \n", clilen, cliaddr.sun_path);
+                printf("ret= %d %d, %s \n", ret ,clilen, cliaddr.sun_path);
                 printf("cmd.vmName:%s\n", cmd.vmName);
                 switch(cmd.cmd)
                 {

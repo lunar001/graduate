@@ -18,6 +18,8 @@
 
 #define SVSHM_MODE (SHM_R | SHM_W | SHM_R >> 3 | SHM_R >> 6)
 
+#define BUFFLENGTH  8192
+
 enum MigrateFlag
 {
     MIGRATEBEGINF,
@@ -54,6 +56,8 @@ private:
     thread * edthread;
     string edCard;
     void ThreadFunc();
+
+    int devicefd;
 public:
     // migrate
     thread * migrateThread;
