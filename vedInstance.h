@@ -11,6 +11,9 @@
 #include <fcntl.h>
 #include <sys/shm.h>
 #include <semaphore.h>
+#include <string.h>
+#include <memory.h>
+#include <sys/ioctl.h>
 
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
@@ -19,6 +22,23 @@
 #define SVSHM_MODE (SHM_R | SHM_W | SHM_R >> 3 | SHM_R >> 6)
 
 #define BUFFLENGTH  8192
+
+#define MIGRATE_BEGIN  0X10100001
+#define MIGRATE_END    0X10100002
+#define MIGRATE_IMPORT 0X10100003
+#define MIGRATE_EXPORT 0X10100004
+#define IMPORT_KEYS    0X10100005
+
+struct scale
+{
+    int len;
+    int plen;
+    int wlen;
+    int keys;
+    char  inputbuf[BUFFLENGTH];
+    char  outputbuf[BUFFLENGTH];
+    int retcode;
+};
 
 enum MigrateFlag
 {
@@ -40,8 +60,8 @@ public:
     void Start();
     void Stop();
     int  ImportKeys(const int keys, const int keyNo);
-    int  StoreLocalBuf();
-    int  LoadLocalBuf();
+    int  StoreLocalBuf(struct scale * localbuf);
+    int  LoadLocalBuf(struct scale * localbuf);
     void CreateShareMemory(const int size);
     void DestroyShareMemory();
 private:

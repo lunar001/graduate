@@ -36,6 +36,7 @@ void VedInstance::CreateShareMemory(const int size)
            
    }
    shmid = id;
+   printf("%d\n", id);
    // create semphore
    oflag = O_RDWR | O_CREAT;
    cout<< "vmName = " << vmName<< endl;
@@ -44,7 +45,7 @@ void VedInstance::CreateShareMemory(const int size)
    {
         printf("create sem1 error\n");
    }
-   sem2 = sem_open(sem2Name.c_str(), oflag, FILE_MODE, 1);
+   sem2 = sem_open(sem2Name.c_str(), oflag, FILE_MODE, 0);
    if(sem2 == SEM_FAILED)
    {
 
@@ -86,7 +87,7 @@ void VedInstance::Initialize(const string & edcard_, const string & vmName_)
 {
     edCard = edcard_;
     vmName = vmName_;
-    CreateShareMemory(100);
+    CreateShareMemory(BUFFLENGTH);
     return;
 }
 void VedInstance::ThreadFunc()
@@ -100,7 +101,7 @@ void VedInstance::ThreadFunc()
     while(true)
     {
         printf("begin to wait\n");
-        sem_wait(sem1);
+        sem_wait(sem2);
         if(stop == 1)
         {
             printf("stop recv\n");
@@ -108,7 +109,7 @@ void VedInstance::ThreadFunc()
         }
         m = write(devicefd, sbuf, BUFFLENGTH);
         m = read(devicefd, sbuf, BUFFLENGTH);
-        sem_post(sem2);
+        sem_post(sem1);
     }
     return ;
 }
@@ -129,25 +130,70 @@ void VedInstance::Stop()
 {
     // stop edthread
     stop = 1;
-    sem_post(sem1);
+    printf("%s\n", __func__);
+    sem_post(sem2);
     edthread->join();
     close(devicefd);
     delete edthread;
 }
 int VedInstance::ImportKeys(const int keys, const int keyNo)
 {
+   int ret = -1;
    printf("import\n");
+   struct scale key;
+   memset(&key, 0, sizeof(key));
+   keyNos.push_back(keyNo);
+   key.keys = keys;
+   ret = ioctl(devicefd, IMPORT_KEYS, &key);
+   if(ret < 0)
+   {
+        printf("%s,ioctl error\n", __func__ );
+        return -1;
+   }
+   if(key.retcode == 0)
+   {
+        printf("import keys error\n");
+        return -1;
+   }
    return 0; 
 }
 
-int VedInstance::StoreLocalBuf()
+int VedInstance::StoreLocalBuf(struct scale * localbuf)
 {
+    int ret = -1;
     printf("%s\n",__func__);
+    // first susspend edcard
+    ret = ioctl(devicefd, MIGRATEBEGINF, NULL);
+    if(ret < 0)
+    {
+        printf("%s:ioctl error\n", __func__);
+        return -1;
+    }
+    ret = ioctl(devicefd, MIGRATE_EXPORT, &localbuf); 
+    if(ret < 0 || localbuf->retcode != 0)
+    {
+        printf("export local error\n");
+        return -1;
+    }
     return 0;
 }
 
-int VedInstance::LoadLocalBuf()
+int VedInstance::LoadLocalBuf(struct scale * localbuf)
+
 {
     printf("%s\n", __func__);
+    int ret = -1;
+    ret = ioctl(devicefd, MIGRATE_IMPORT, localbuf);
+    if(ret < 0 || localbuf->retcode != 0)
+    {
+        printf("import local error\n");
+        return -1;
+    }
+    ret = ioctl(devicefd, MIGRATE_END, NULL);
+    if(ret < 0)
+    {
+        printf("resume edcard error\n");
+        return -1;
+    }
     return 0;
 }

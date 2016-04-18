@@ -28,6 +28,7 @@ main(int argc, char **argv)
         printf("shmget sbuf error\n");
         return -1;
     }
+    printf("%d\n", id);
     sbuf = (char *)shmat(id, NULL, 0);
     if(sbuf == (void *)-1)
     {
@@ -54,6 +55,7 @@ main(int argc, char **argv)
     printf("%d\n", val);
     sem_getvalue(sem2, &val);
     printf("%d\n", val);
+    getchar();
    // while(true)
     //{
         sem_wait(sem2);

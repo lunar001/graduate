@@ -503,7 +503,7 @@ int CreateVed(const string & vmName_/*, const string & edcard*/)
         
 {
     VedInstance * ved = new VedInstance;
-    ved->Initialize("/dev/swcsm-pci09-01", vmName_);
+    ved->Initialize("/dev/swcsm-pci09-0", vmName_);
     ved->Start();
     vedManager.Insert(vmName_, ved);
     printf("create ved recved\n");
@@ -518,7 +518,9 @@ int DestroyVed(const string & vmName)
         printf("%s has not allocate a vedcard\n", vmName.c_str());
         return -1;
     }
+    printf("%s\n", __func__);
     ved->Stop();
+    printf("%s\n", __func__);
     ved->DestroyShareMemory();
     vedManager.Delete(vmName);
     return 0;
@@ -609,10 +611,16 @@ int migrated_fuc(void * arg)
         printf("error step\n");
         return -1;
     }
-    char  localbuf[100] = {'\0'};
-    ret = key_pair_recv(ved->migratedfd, localbuf, dh.len);
-    ved->LoadLocalBuf();
-    printf("localbuf:%s\n", localbuf);
+    struct scale localbuf;
+    memset(&localbuf, 0, sizeof(localbuf));
+    ret = key_pair_recv(ved->migratedfd, &localbuf, dh.len);
+    ret = ved->LoadLocalBuf(&localbuf);
+    if(ret < 0)
+    {
+        printf("load localbuf error\n");
+        close(ved->migratedfd);
+        return -1;
+    }
     dh.cmd = MIGRATE_LOCAL_SUCCESS;
     dh.len = 0;
     printf("send...\n");
@@ -725,13 +733,20 @@ int migrate_func(void * arg)
             printf("begin local migrate");
         }
     }
-    ved->StoreLocalBuf();
+    struct scale localbuf;
+    memset(&localbuf, 0, sizeof(localbuf));
+    ret = ved->StoreLocalBuf(&localbuf);
+    if(ret < 0)
+    {
+        printf("store localbuf error\n");
+        close(ved->migratefd);
+        return -1;
+    }
     memset(&dh, 0, sizeof(dh));
-    char localbuf[] = "local";
     dh.cmd = MIGRATELOCAL;
-    dh.len = strlen(localbuf);
+    dh.len = sizeof(localbuf);
     ret = key_pair_send(ved->migratefd, &dh, sizeof(dh));
-    ret = key_pair_send(ved->migratefd, localbuf, dh.len);
+    ret = key_pair_send(ved->migratefd, &localbuf, dh.len);
     memset(&dh, 0, sizeof(dh));
     printf("wait for migrate local ack\n");
     ret = key_pair_recv(ved->migratefd, &dh, sizeof(dh));
