@@ -66,7 +66,6 @@ public:
     void DestroyShareMemory();
 private:
     vector<int> keyNos;
-    string vmName;
     int shmid;
     char * sbuf;
     sem_t * sem1;
@@ -80,6 +79,7 @@ private:
     int devicefd;
 public:
     // migrate
+    string vmName;
     thread * migrateThread;
     mutex mtx;
     condition_variable cv;

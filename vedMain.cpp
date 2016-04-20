@@ -25,7 +25,7 @@
 #include "vedInstanceManager.h"
 #include "vedInstance.h"
 
-#define SERV_PORT 	9878
+#define SERV_PORT  23456	
 #define SERV_PORT_STRING "9878"
 #define LISTENQ		1024
 #define MAX_EPOLL_FD	256
@@ -78,14 +78,16 @@ struct data_head
     int len;
 };
 
+int locallen  = 0;
+char localbuff[32768]={'\0'};
 VedInstanceManager vedManager;
-char keyServer[] = "115.156.186.138";
+char keyServer[] = "211.69.192.101";
 char keyServerPort[] = "9878";
 int keyServerPortInt = 9878;
-char spServerName[] = "115.156.186.138";
-char dpPort[] = "9899";
-char dpServerName[] = "115.156.186.138";
-char keyServerName[] = "115.156.186.138";
+char spServerName[] = "211.69.192.101";
+char dpPort[] = "9877";
+char dpServerName[] = "211.69.192.100";
+char keyServerName[] = "211.69.192.101";
 char localhost[] = "localhost";
 int key = 14;
 char vedManagerPath[] = "/var/edcard";
@@ -335,6 +337,33 @@ int syn_daemon_udp_domain_server(char * pathname)
 	return sockfd;
 	
 }
+int init_tcp_listenfd_simple(char * host_name, char * serverport)
+{
+
+    int port = atoi(serverport);
+    int listenfd = 0;
+
+    struct sockaddr_in servaddr;
+    int ret = 0; 
+    memset(&servaddr, 0, sizeof(servaddr));
+    listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htonl(port);
+    ret = bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr) );
+    if(ret < 0)
+    {
+        printf("bind error:%s\n", strerror(errno));
+        return -1;
+    }
+    ret = listen(listenfd, LISTENQ);
+    if(ret < 0)
+    {
+        printf("listen error:%s\n",strerror(errno));
+        return -1;
+    }
+    return listenfd;
+}
 int init_tcp_listenfd(char * host_name,char * servport)
 {
 	struct addrinfo hints,*res,*resave;
@@ -430,7 +459,7 @@ int init_tcp_connect(const char * host_name, const char * port)
 	printf("sockfd:%d\n",sockfd);	
 	return sockfd;
 }
-int init_tcp_connect_simple(char * host_name, int port)
+int init_tcp_connect_simple(char * host_name, short port)
 {
     struct sockaddr_in  serveraddr;
     int sockfd = 0;
@@ -438,8 +467,13 @@ int init_tcp_connect_simple(char * host_name, int port)
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    serveraddr.sin_port = htonl(port);
-    inet_pton(AF_INET, host_name, &serveraddr.sin_addr);
+    serveraddr.sin_port = htons(port);
+    ret = inet_pton(AF_INET, host_name, &serveraddr.sin_addr);
+    if(ret != 1)
+    {
+        printf("inet_pton error:%s\n", strerror(errno));
+        return -1;
+    }
     ret =connect(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
     if(ret < 0)
     {
@@ -448,11 +482,6 @@ int init_tcp_connect_simple(char * host_name, int port)
         return -1;
     }
     return sockfd;
-
-
-
-
-
 }
 
 // dynamic get keys and import to edcard
@@ -462,6 +491,7 @@ int KeysGetandImport(char * vmName)
     // first connect keyserver
     int ret = 0;
     int key = 0;
+    char keys[8192] = {'\0'};
     VedInstance * ved = vedManager.GetInstance(vmName);
     if(ved == NULL)
     {
@@ -492,8 +522,9 @@ int KeysGetandImport(char * vmName)
         close(sockfd);
         return -1;
     }
-    ret = key_pair_recv(sockfd, &key, dh.len);
-    printf("key:%d\n",key);
+    printf("dh.len %d\n", dh.len);
+    if(dh.len != 0)
+        ret = key_pair_recv(sockfd, &keys, dh.len);
     
     ret = ved->ImportKeys(key, key);
     if(ret != 0)
@@ -541,6 +572,7 @@ int migrated_fuc(void * arg)
 {
     VedInstance * ved = (VedInstance *)arg;
     int ret = 0;
+    char keys[8192] = {'\0'};
     struct data_head dh;
     char vmName[] = "vmName";
     int sockfd;
@@ -614,8 +646,12 @@ int migrated_fuc(void * arg)
         close(sockfd);
         return -1;
     }
-    ret = key_pair_recv(sockfd, &key, dh.len);
-    printf("key:%d\n",key);
+    if(dh.len != 0)
+    {
+        ret = key_pair_recv(sockfd, &keys, dh.len);
+        printf("recv keys:%d\n", ret);
+    }
+    int key = 4;
     ret = ved->ImportKeys(key, key);
     if(ret != 0)
     {
@@ -638,8 +674,12 @@ int migrated_fuc(void * arg)
     }
     struct scale localbuf;
     memset(&localbuf, 0, sizeof(localbuf));
-    ret = key_pair_recv(ved->migratedfd, &localbuf, dh.len);
-    ret = ved->LoadLocalBuf(&localbuf);
+    if(dh.len != 0)
+    {
+        ret = key_pair_recv(ved->migratedfd, localbuff, dh.len);
+        printf("recv localbuff:%d\n", ret);
+    }
+            ret = ved->LoadLocalBuf(&localbuf);
     if(ret < 0)
     {
         printf("load localbuf error\n");
@@ -648,9 +688,7 @@ int migrated_fuc(void * arg)
     }
     dh.cmd = MIGRATE_LOCAL_SUCCESS;
     dh.len = 0;
-    printf("send...\n");
     ret = key_pair_send(ved->migratedfd, &dh, sizeof(dh));
-    printf("sent ack:%d\n", ret);
     memset(&dh, 0, sizeof(dh));
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != MIGRATEFIN)
@@ -777,9 +815,10 @@ int migrate_func(void * arg)
     }
     memset(&dh, 0, sizeof(dh));
     dh.cmd = MIGRATELOCAL;
-    dh.len = sizeof(localbuf);
+    //dh.len = sizeof(localbuf);
+    dh.len = locallen;
     ret = key_pair_send(ved->migratefd, &dh, sizeof(dh));
-    ret = key_pair_send(ved->migratefd, &localbuf, dh.len);
+    ret = key_pair_send(ved->migratefd, localbuff, dh.len);
     memset(&dh, 0, sizeof(dh));
     printf("wait for migrate local ack\n");
     ret = key_pair_recv(ved->migratefd, &dh, sizeof(dh));
@@ -919,7 +958,7 @@ int migrated(int sockfd)
 
 }
 int
-main()
+main(int argc, char * argv[])
 {
     int ret = 0;
     struct Command cmd;
@@ -930,6 +969,12 @@ main()
 	struct epoll_event event;
     int nready = 0;
     int i = 0;
+    if(argc != 2)
+    {
+        printf("argument error\n");
+        return -1;
+    }
+    locallen =  atoi(argv[1]);
     epollfd = epoll_create(MAX_EPOLL_FD);
 	if(epollfd == -1)
 	{

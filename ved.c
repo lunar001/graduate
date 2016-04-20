@@ -19,7 +19,7 @@
 #include<netdb.h>
 #include<sys/un.h>
 #include<sys/epoll.h>
-
+#include<sys/time.h>
 
 
 #define vedManagerPath "/var/edcard"
@@ -32,7 +32,16 @@
 #define MIGRATELOCAL 0x10100006
 #define MIGRATEFIN   0x10100007
 
-
+char * usage = "\
+ved create       vmName       ----  create a vedcard for vmName;\n\
+ved destroy      vmName       ----  destroy vmName's vedcard;\n\
+ved importkey    vmName       ----  import key for vmName;\n\
+ved migrate      vmName dpIp  ----  migrate vedcard for vmName;\n\
+    migratekey   vmName dpIp  ----  migrate key of vmName;\n\
+    migratelocal vmName dpIp  ----  migrate local vedcard for vmName;\n\
+    migratefin   vmName dpIp  ----  ask other side whether migrate finish;\n\
+ved list         [vmName]     ----  list vmName's vedcard info;\
+";
 struct Command
 {
     int cmd;
@@ -47,6 +56,9 @@ main(int argc, char * argv[])
     struct Command command; 
     int sockfd = 0;
     struct sockaddr_un clientaddr, serveraddr;
+    struct timeval start;
+    struct timeval end;
+    double time = 0.0;
     socklen_t len = sizeof(clientaddr);
     sockfd = socket(AF_LOCAL, SOCK_DGRAM, 0);
     memset(&serveraddr, 0, sizeof(serveraddr));
@@ -61,11 +73,11 @@ main(int argc, char * argv[])
     if(argc < 2)
     {
         printf("please enter correct parameter\n");
+        printf("%s\n",usage);
         return -1;
     }
     char cmd[100] = {'\0'};
     strcpy(cmd, argv[1]);
-    printf("cmd:%s\n", cmd); 
     if(strcmp(cmd, "create") == 0)
     {
         printf("argc :%d\n", argc);
@@ -77,11 +89,8 @@ main(int argc, char * argv[])
         memset(&command, 0, sizeof(command));
         command.cmd  = CREATEVED;
         strcpy(command.vmName, argv[2]);
-        printf("%s\n", clientaddr.sun_path);
         ret = sendto(sockfd, &command, sizeof(command), 0, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-        printf("ret = %d\n", ret);
         ret = recvfrom(sockfd, &command, sizeof(command), 0, (struct sockaddr *)&serveraddr,&len); 
-        printf("ret = %d\n", ret);
         if(command.cmd == ACTOK)
         {
             printf("create ved success\n");       
@@ -124,9 +133,12 @@ main(int argc, char * argv[])
        {
             printf("import key success\n");
        }
+       else 
+            printf("importkey error\n");
     }
     else if(strcmp(cmd, "migratekey") == 0)
     {
+        gettimeofday(&start, NULL);
         if(argc != 4)
         {
             printf("ved migratekey vmname dpname\n");
@@ -146,10 +158,14 @@ main(int argc, char * argv[])
             printf("migrate key error\n");
             return -1;
         }
+        gettimeofday(&end, NULL);
+        time = (end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec;
+        printf("time: %f ms\n", time/1000);
 
     }
     else if(strcmp(cmd,"migratelocal")==0)
     {
+        gettimeofday(&start, NULL);
         if(argc != 4)
         {
             printf("ved migratelocal vmname dpname\n");
@@ -170,9 +186,13 @@ main(int argc, char * argv[])
             printf("migrate local error\n");
             return -1;
         }
+        gettimeofday(&end, NULL);
+        time = (end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec;
+        printf("time: %f ms\n", time/1000);
     }
     else if(strcmp(cmd, "migratefin") == 0)
     {
+        gettimeofday(&start, NULL);
         if(argc != 4)
         {
             printf("ved migratefin vmname dpname\n");
@@ -193,6 +213,9 @@ main(int argc, char * argv[])
             printf("migrate fin error\n");
             return -1;
         }
+        gettimeofday(&end, NULL);
+        time = (end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec;
+        printf("time: %f ms\n", time/1000);
     }
 
     return 0;
