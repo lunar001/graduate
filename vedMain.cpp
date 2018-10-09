@@ -1,29 +1,31 @@
-
-#include<stdio.h>
-#include<unistd.h>
-#include<getopt.h>
-#include<sys/stat.h>
-#include<stdlib.h>
-#include<sys/socket.h>
-#include<sys/types.h>
-#include<string.h>
-#include<asm/types.h>
-#include<linux/netlink.h>
-#include<linux/socket.h>
-#include<errno.h>
-#include<poll.h>
-#include<sys/socket.h>
-#include<syslog.h>
-#include<fcntl.h>
-#include<netinet/in.h>
-#include<sys/socket.h>
-#include<netdb.h>
-#include<arpa/inet.h>
-#include<sys/un.h>
-#include<sys/epoll.h>
-#include<error.h>
-#include "vedInstanceManager.h"
+#include <stdio.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <string.h>
+#include <asm/types.h>
+#include <linux/netlink.h>
+#include <linux/socket.h>
+#include <errno.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <syslog.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/un.h>
+#include <sys/epoll.h>
+#include <error.h>
+#include  "vedInstanceManager.h"
 #include "vedInstance.h"
+
+#define pr_err(fmt,args...) printf(fmt, ##args)
+#define pr_info(fmt,args...)  printf(fmt, ##args)
 
 #define SERV_PORT  23456	
 #define SERV_PORT_STRING "9878"
@@ -32,9 +34,6 @@
 #define MAX_EPOLL_EVENT	64
 #define MIGRATE_PORT    9899
 #define MIGRATE_PORT_STRING "9899"
-
-
-
 
 #define CREATEVED    0X10100001
 #define DESTROYVED   0X10100002
@@ -139,19 +138,19 @@ int key_pair_recv(int sockfd,void * buf,int len)
 			if(results == 0)
 			{
 				//收到了对端的FIN分节
-				printf("Recv FIN\n");
+				pr_info("Recv FIN\n");
 				return 0;
 			}
 			else
 			{
 				if(errno == EINTR)
 				{
-					printf("Interrupt by sighandler\n");
+					pr_info("Interrupt by sighandler\n");
 					continue;
 				}
 				else
 				{
-					printf("error happend %s\n", strerror(errno));
+					pr_info("error happend %s\n", strerror(errno));
 					return -1;
 				}
 			}
@@ -162,7 +161,7 @@ int key_pair_recv(int sockfd,void * buf,int len)
 		total = total + results;
 
 	}while(len);
-	printf("recv total:%d\n",total);
+	pr_info("recv total:%d\n",total);
 	return total;
 }
 int AuthCertRecv(int connfd)
@@ -173,18 +172,18 @@ int AuthCertRecv(int connfd)
     int ret = 0;
     memset(&dh, 0, sizeof(dh));
     ret  = key_pair_recv(connfd,&dh,sizeof(dh));
-    printf("recv :%d\n",ret);
+    pr_info("recv :%d\n",ret);
     // verify
     if(dh.cmd != VERIFY)
     {
-            printf("received error package\n");
+            pr_info("received error package\n");
             close(connfd);
             return -1;
     }
     ret = key_pair_recv(connfd, buf, dh.len);
     if(strcmp(spServerName, buf) != 0)
     {
-            printf("verify error\n");
+            pr_info("verify error\n");
             dh.cmd = VERIFY_FAILED;
             dh.len = 0;
             key_pair_send(connfd, &dh, sizeof(dh));
@@ -203,14 +202,14 @@ int AuthCertRecv(int connfd)
     key_pair_recv(connfd, &dh, sizeof(dh));
     if(dh.cmd != VERIFY_SUCCESS)
     {
-            printf("verify failed\n");
+            pr_info("verify failed\n");
             close(connfd);
             return -1;
     }
     key_pair_recv(connfd, &dh, sizeof(dh));
     if(dh.cmd != KM_SYN)
     {
-            printf("received error segment");
+            pr_info("received error segment");
             close(connfd);
             return -1;
     }
@@ -234,23 +233,23 @@ int AuthCertSend(int connfd)
     ret  = key_pair_send(connfd, &dh, sizeof(dh));
     if(ret != sizeof(dh))
     {
-        printf("Verify:send dh error\n");
+        pr_info("Verify:send dh error\n");
         close(connfd);
         return -1;
     }
     ret = key_pair_send(connfd, spServerName, dh.len);
     if(ret != dh.len)
     {
-        printf("Verify:send data error\n");
+        pr_info("Verify:send data error\n");
         close(connfd);
         return -1;
     }
     ret  = key_pair_recv(connfd,&dh,sizeof(dh));
-    printf("recv :%d\n",ret);
+    pr_info("recv :%d\n",ret);
     // verify
     if(dh.cmd != VERIFY_SUCCESS)
     {
-            printf("verify error\n");
+            pr_info("verify error\n");
             close(connfd);
             return -1;
     }
@@ -258,15 +257,15 @@ int AuthCertSend(int connfd)
     ret = key_pair_recv(connfd, &dh, sizeof(dh));
     if(dh.cmd != VERIFY)
     {
-        printf("Verify recv error segment\n");
+        pr_info("Verify recv error segment\n");
         close(connfd);
         return -1;
     }
     ret = key_pair_recv(connfd, buf, dh.len);
-    printf("buf:%s\n", buf);
+    pr_info("buf:%s\n", buf);
     if(strcmp(keyServerName, buf) != 0)
     {
-            printf("verify error\n");
+            pr_info("verify error\n");
             dh.cmd = VERIFY_FAILED;
             dh.len = 0;
             key_pair_send(connfd, &dh, sizeof(dh));
@@ -276,22 +275,22 @@ int AuthCertSend(int connfd)
     dh.cmd = VERIFY_SUCCESS;
     dh.len = 0;
     key_pair_send(connfd, &dh, sizeof(dh));
-    printf("send*...\n");
+    pr_info("send*...\n");
     memset(&dh, 0, sizeof(dh));
     dh.cmd = KM_SYN;
     dh.len = sizeof(int);
     ret = key_pair_send(connfd, &dh, sizeof(dh));
     if(ret != sizeof(dh))
     {
-        printf("KM_SYN: send km head error\n");
+        pr_info("KM_SYN: send km head error\n");
         close(connfd);
         return -1;
     }
     ret = key_pair_send(connfd, &key, dh.len);
-    printf("%d\n", ret);
+    pr_info("%d\n", ret);
     if(ret != dh.len)
     {
-        printf("KM_SYN: send km error\n");
+        pr_info("KM_SYN: send km error\n");
         close(connfd);
         return -1;
     }
@@ -299,13 +298,13 @@ int AuthCertSend(int connfd)
     ret = key_pair_recv(connfd, &dh, sizeof(dh));
     if(ret != sizeof(dh))
     {
-        printf("recv a error segment\n");
+        pr_info("recv a error segment\n");
         close(connfd);
         return -1;
     }
     if(dh.cmd != ACK_KM_SYN)
     {
-        printf("server have not recv km\n");
+        pr_info("server have not recv km\n");
         close(connfd);
         return -1;
      }
@@ -321,7 +320,7 @@ int syn_daemon_udp_domain_server(char * pathname)
 	sockfd = socket(AF_LOCAL,SOCK_DGRAM,0);
 	if(sockfd == -1 )
 	{
-		printf("create sockfd error,%s\n",strerror(errno));
+		pr_info("create sockfd error,%s\n",strerror(errno));
 		return -1;
 	}
 	servaddr.sun_family = AF_LOCAL;
@@ -330,10 +329,10 @@ int syn_daemon_udp_domain_server(char * pathname)
 	ret = bind(sockfd,(struct sockaddr *)(&servaddr),sizeof(servaddr));
 	if(ret != 0)
 	{
-		printf("creat sockfd error\n");
+		pr_info("creat sockfd error\n");
 		return -1;
 	}
-	printf("create unix sockfd successfully\n");
+	pr_info("create unix sockfd successfully\n");
 	return sockfd;
 	
 }
@@ -353,13 +352,13 @@ int init_tcp_listenfd_simple(char * host_name, char * serverport)
     ret = bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr) );
     if(ret < 0)
     {
-        printf("bind error:%s\n", strerror(errno));
+        pr_info("bind error:%s\n", strerror(errno));
         return -1;
     }
     ret = listen(listenfd, LISTENQ);
     if(ret < 0)
     {
-        printf("listen error:%s\n",strerror(errno));
+        pr_info("listen error:%s\n",strerror(errno));
         return -1;
     }
     return listenfd;
@@ -376,7 +375,7 @@ int init_tcp_listenfd(char * host_name,char * servport)
 	ret = getaddrinfo(host_name,servport,&hints,&res);	
 	if(ret)
 	{
-		printf("getaddrinfo error :%s\n",gai_strerror(ret));
+		pr_info("getaddrinfo error :%s\n",gai_strerror(ret));
 		return -1;
 	}
 	resave = res;
@@ -393,7 +392,7 @@ int init_tcp_listenfd(char * host_name,char * servport)
 	}while((res = res->ai_next)!=NULL);
 	if(res == NULL)
 	{
-		printf("create socket error\n");
+		pr_info("create socket error:%s\n", strerror(errno));
 		freeaddrinfo(resave);
 		listenfd = -1;
 		return listenfd;
@@ -401,7 +400,7 @@ int init_tcp_listenfd(char * host_name,char * servport)
 	}
 	listen(listenfd,LISTENQ);
 	freeaddrinfo(resave);
-	printf("create listenfd successfully\n");
+	pr_info("create listenfd successfully\n");
 	return listenfd;
 }
 
@@ -420,31 +419,31 @@ int init_tcp_connect(const char * host_name, const char * port)
 	ret = getaddrinfo(host_name, port, &hints,&res);
 	if(ret != 0)
 	{
-		printf("error %s\n",gai_strerror(ret));
+		pr_info("error %s\n",gai_strerror(ret));
 		return -1;
 	}
-	printf("here ok!\n");
+	pr_info("here ok!\n");
 	resave = res;
 	do{
 		struct sockaddr_in * si= NULL;
 		sockfd = socket(res->ai_family,res->ai_socktype,res->ai_protocol);
 		if(sockfd == -1)
 		{
-			printf("socket error\n");
+			pr_info("socket error\n");
 			continue;
 
 		}
-		printf("socket good\n");
+		pr_info("socket good\n");
 		//setsockopt(listenfd,SOL_SOCKET,SO_REUSEADDR,&on,sizeof(on));
 		si = (struct sockaddr_in *)(res->ai_addr);
-		printf("ok??\n");
-	/*	printf("trying to connect to servaddr:%s,port:%d\n",
+		pr_info("ok??\n");
+	/*	pr_info("trying to connect to servaddr:%s,port:%d\n",
 				inet_ntop(res->ai_family,&si->sin_addr,straddr,sizeof(straddr)),
 				ntohs(si->sin_port));
 	*/	ret = connect(sockfd,res->ai_addr,res->ai_addrlen);
 		if(ret == 0)
 			break;
-		printf("connect to server error:%s\n",strerror(errno));
+		pr_info("connect to server error:%s\n",strerror(errno));
 		close(sockfd);
 
 		res=res->ai_next;
@@ -453,10 +452,10 @@ int init_tcp_connect(const char * host_name, const char * port)
 	}while(1);
 	if(res== NULL)
 	{
-		printf("connect error\n");
+		pr_info("connect error\n");
 	}
 	freeaddrinfo(resave);
-	printf("sockfd:%d\n",sockfd);	
+	pr_info("sockfd:%d\n",sockfd);	
 	return sockfd;
 }
 int init_tcp_connect_simple(char * host_name, short port)
@@ -471,13 +470,13 @@ int init_tcp_connect_simple(char * host_name, short port)
     ret = inet_pton(AF_INET, host_name, &serveraddr.sin_addr);
     if(ret != 1)
     {
-        printf("inet_pton error:%s\n", strerror(errno));
+        pr_info("inet_pton error:%s\n", strerror(errno));
         return -1;
     }
     ret =connect(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
     if(ret < 0)
     {
-        printf("connect server error %s\n",strerror(errno));
+        pr_info("connect server error %s\n",strerror(errno));
         close(sockfd);
         return -1;
     }
@@ -495,41 +494,47 @@ int KeysGetandImport(char * vmName)
     VedInstance * ved = vedManager.GetInstance(vmName);
     if(ved == NULL)
     {
-        printf("vmName %s not allocate vedcard\n", vmName);
+        pr_info("vmName %s not allocate vedcard\n", vmName);
         return -1;
     }
     sockfd = init_tcp_connect(keyServer, keyServerPort);
-    printf("%s: sockfd:%d\n", __func__, sockfd);
+    pr_info("%s: sockfd:%d\n", __func__, sockfd);
     ret = AuthCertSend(sockfd);
     if(ret != 0)
     {
-        printf("auth error\n");
+        pr_info("auth error\n");
         close(sockfd);
         return -1;
     }
-    printf("auth success\n");
+    pr_info("auth success\n");
     struct data_head dh;
     dh.cmd = REQ_KEY;
     dh.len = strlen(vmName);
-    printf("dh.len :%d\n",dh.len);
+    pr_info("dh.len :%d\n",dh.len);
     ret = key_pair_send(sockfd, &dh, sizeof(dh));
     ret = key_pair_send(sockfd, vmName, dh.len);
     memset(&dh, 0, sizeof(dh));
     ret = key_pair_recv(sockfd, &dh, sizeof(dh));
     if(dh.cmd != SEND_KEY)
     {
-        printf("recv error segment");
+        pr_info("recv error segment");
         close(sockfd);
         return -1;
     }
-    printf("dh.len %d\n", dh.len);
+    pr_info("dh.len %d\n", dh.len);
+    char * p = keys;
     if(dh.len != 0)
-        ret = key_pair_recv(sockfd, &keys, dh.len);
-    
+    {
+        for(int i = 0; i< dh.len; i = i+1024)
+        {
+            ret = key_pair_recv(sockfd, p, 1024);
+            p = p + 1024;
+        }
+    }
     ret = ved->ImportKeys(key, key);
     if(ret != 0)
     {
-        printf("import keys error\n");
+        pr_info("import keys error\n");
         close(sockfd);
         return -1;
     }
@@ -544,7 +549,7 @@ int CreateVed(const string & vmName_/*, const string & edcard*/)
     ved->Initialize("/dev/swcsm-pci09-0", vmName_);
     ved->Start();
     vedManager.Insert(vmName_, ved);
-    printf("create ved recved\n");
+    pr_info("create ved recved\n");
     return 0;
 
 }
@@ -553,12 +558,12 @@ int DestroyVed(const string & vmName)
     VedInstance * ved = vedManager.GetInstance(vmName);
     if(ved == NULL)
     {
-        printf("%s has not allocate a vedcard\n", vmName.c_str());
+        pr_info("%s has not allocate a vedcard\n", vmName.c_str());
         return -1;
     }
-    printf("%s\n", __func__);
+    pr_info("%s\n", __func__);
     ved->Stop();
-    printf("%s\n", __func__);
+    pr_info("%s\n", __func__);
     ved->DestroyShareMemory();
     vedManager.Delete(vmName);
     return 0;
@@ -576,11 +581,11 @@ int migrated_fuc(void * arg)
     struct data_head dh;
     char vmName[] = "vmName";
     int sockfd;
-    printf("%s\n", __func__);
+    pr_info("%s\n", __func__);
     ret = AuthCertRecv(ved->migratedfd);
     if(ret != 0)
     {
-        printf("auth error\n");
+        pr_info("auth error\n");
         return -1 ;
     
     }
@@ -589,15 +594,15 @@ int migrated_fuc(void * arg)
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != MIGRATE_VMNAME)
     {
-        printf("recv error segment\n");
+        pr_info("recv error segment\n");
         close(ved->migratefd);
         return -1 ;
     
     }
     char buf[20] = {'\0'};
-    printf("recv name %d\n",dh.len);
+    pr_info("recv name %d\n",dh.len);
     ret = key_pair_recv(ved->migratedfd, buf, dh.len);
-    printf("buf:%s %d\n",buf,dh.len);
+    pr_info("buf:%s %d\n",buf,dh.len);
     ved->Initialize("/dev/swcsm-pci09-0", buf);
     ved->Start();
     vedManager.Insert(ved->vmName, ved);
@@ -606,7 +611,7 @@ int migrated_fuc(void * arg)
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != MIGID_SYN)
     {
-        printf("recv a wrong segmemt\n");
+        pr_info("recv a wrong segmemt\n");
         return -1;
     }
     dh.cmd = MIGID_SYN_ACK;
@@ -616,46 +621,49 @@ int migrated_fuc(void * arg)
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != IMPORT_KEY_BEGIN)
     {
-        printf("recv error segmemt\n");
+        pr_info("recv error segmemt\n");
         return -1;
     }
-    printf("recv begin get key\n");
+    pr_info("recv begin get key\n");
     sockfd = init_tcp_connect(keyServerName, keyServerPort);
     //sockfd = init_tcp_connect_simple(keyServer,keyServerPortInt);
     if(sockfd < 0)
     {
-        printf("connect keyServer error\n");
+        pr_info("connect keyServer error\n");
         return -1;
     }
     ret = AuthCertSend(sockfd);
     if(ret < 0)
     {
-        printf("verify keyserver error\n");
+        pr_info("verify keyserver error\n");
         return -1;
     }
     dh.cmd = REQ_KEY;
     dh.len = strlen(vmName);
-    printf("dh.len :%d\n",dh.len);
+    pr_info("dh.len :%d\n",dh.len);
     ret = key_pair_send(sockfd, &dh, sizeof(dh));
     ret = key_pair_send(sockfd, vmName, dh.len);
     memset(&dh, 0, sizeof(dh));
     ret = key_pair_recv(sockfd, &dh, sizeof(dh));
     if(dh.cmd != SEND_KEY)
     {
-        printf("recv error segment");
+        pr_info("recv error segment");
         close(sockfd);
         return -1;
     }
+    char * p = keys;
     if(dh.len != 0)
     {
-        ret = key_pair_recv(sockfd, &keys, dh.len);
-        printf("recv keys:%d\n", ret);
+        for(int i = 0; i<dh.len; i = i+1024)
+        ret = key_pair_recv(sockfd, p, 1024);
+        p = p + 1024;
+        pr_info("recv keys:%d\n", ret);
     }
     int key = 4;
     ret = ved->ImportKeys(key, key);
     if(ret != 0)
     {
-        printf("import keys error\n");
+        pr_info("import keys error\n");
         close(sockfd);
         return -1;
     }
@@ -664,25 +672,29 @@ int migrated_fuc(void * arg)
     dh.cmd = IMPORT_KEY_SUCCESS ;
     dh.len = 0;
     ret = key_pair_send(ved->migratedfd, &dh, sizeof(dh));
-    printf("send ack to sp\n");
+    pr_info("send ack to sp\n");
     memset(&dh, 0, sizeof(dh));
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != MIGRATELOCAL)
     {
-        printf("error step\n");
+        pr_info("error step\n");
         return -1;
     }
     struct scale localbuf;
     memset(&localbuf, 0, sizeof(localbuf));
     if(dh.len != 0)
     {
-        ret = key_pair_recv(ved->migratedfd, localbuff, dh.len);
-        printf("recv localbuff:%d\n", ret);
+        for(int i = 0; i < dh.len; i = i+1024)
+            {
+                ret = key_pair_recv(ved->migratedfd, p, 1024);
+                pr_info("recv localbuff:%d\n", ret);
+                //p = p + 1024;
+            }
     }
-            ret = ved->LoadLocalBuf(&localbuf);
+    ret = ved->LoadLocalBuf(&localbuf);
     if(ret < 0)
     {
-        printf("load localbuf error\n");
+        pr_info("load localbuf error\n");
         close(ved->migratedfd);
         return -1;
     }
@@ -693,13 +705,13 @@ int migrated_fuc(void * arg)
     ret = key_pair_recv(ved->migratedfd, &dh, sizeof(dh));
     if(dh.cmd != MIGRATEFIN)
     {
-        printf("recv error segment\n");
+        pr_info("recv error segment\n");
         return -1;
     }
     // to something;
     dh.cmd = MIGRATE_FIN_SUCCESS;
     ret = key_pair_send(ved->migratedfd, &dh, sizeof(dh));
-    printf("migrate vedcard finish\n");
+    pr_info("migrate vedcard finish\n");
     return 0;        
 
 
@@ -711,25 +723,25 @@ int migrate_func(void * arg)
     int ret = 0;
     struct data_head dh;
     int sockfd = 0;
-    printf("%s\n", __func__);
+    pr_info("%s\n", __func__);
     {
         unique_lock<mutex> lck(ved->mtx2);
         while(ved->migrateflag != MIGRATEKEYF)
             ved->cv2.wait(lck);
     }
-    printf("auth\n");
+    pr_info("auth\n");
     ret = AuthCertSend(ved->migratefd);
     if(ret != 0)
     {
-        printf("auth error\n");
+        pr_info("auth error\n");
         return 0;
     }
-    printf("%s:auth successfully dp\n",__func__);
+    pr_info("%s:auth successfully dp\n",__func__);
     dh.cmd = MIGRATE_VMNAME;
     dh.len = ved->vmName.size();
     char vmName[20] = {'\0'};
     memcpy(vmName, ved->vmName.c_str(), ved->vmName.size());
-    printf("%s, len:%d\n",vmName, strlen(vmName));
+    pr_info("%s, len:%d\n",vmName, strlen(vmName));
     ret = key_pair_send(ved->migratefd, &dh, sizeof(dh));
     ret = key_pair_send(ved->migratefd, vmName, dh.len);
     
@@ -741,67 +753,67 @@ int migrate_func(void * arg)
     ret = key_pair_recv(ved->migratefd, &dh, sizeof(dh));
     if(dh.cmd != MIGID_SYN_ACK)
     {
-        printf("recv error segmemt\n");
+        pr_info("recv error segmemt\n");
         return -1;
     }
     sockfd = init_tcp_connect(keyServer, keyServerPort);
     if(sockfd < 0)
     {
-        printf("connect to keyServer error\n");
+        pr_info("connect to keyServer error\n");
         return -1;
     }
     ret = AuthCertSend(sockfd);
     if(ret != 0)
     {
-        printf("verify keyServer error\n");
+        pr_info("verify keyServer error\n");
         return -1;
     }
-    printf("auth successfully, keyServer\n");
+    pr_info("auth successfully, keyServer\n");
     // send migId to keyServer
     dh.cmd = MIG_SP;
     dh.len = sizeof(int);
     ret = key_pair_send(sockfd, &dh, sizeof(dh));
-    printf("ret = %d\n", ret);
+    pr_info("ret = %d\n", ret);
     ret = key_pair_send(sockfd, &ved->migId, dh.len);
     memset(&dh, 0, sizeof(dh));
     ret = key_pair_recv(sockfd, &dh, sizeof(dh));
     if(dh.cmd != ACK_OK)
     {
-        printf("send migid to keyserver error\n");
+        pr_info("send migid to keyserver error\n");
         close(sockfd);
         return -1;
     }
-    printf("send migid to keyserver successfully from sp\n");
+    pr_info("send migid to keyserver successfully from sp\n");
     close(sockfd);
     dh.cmd = IMPORT_KEY_BEGIN;
     dh.len = 0;
     ret = key_pair_send(ved->migratefd, &dh, sizeof(dh));
     memset(&dh, 0, sizeof(dh));
-    printf("wait from dp ack\n");
+    pr_info("wait from dp ack\n");
     ret = key_pair_recv(ved->migratefd, &dh, sizeof(dh));
     if(dh.cmd != IMPORT_KEY_SUCCESS)
     {
-        printf("migrate key error\n");
+        pr_info("migrate key error\n");
         /*
         to to how to notify ved migrate error
         
         */
         return -1;
     }
-    printf("MIGRATE KEY SUCCESS\n"); 
+    pr_info("MIGRATE KEY SUCCESS\n"); 
     {
         unique_lock<mutex> lck(ved->mtx);
         ved->migratefinish = MIGRATEKEYF;
         ved->cv.notify_all();
     }
-    printf("wait for migrate local\n");
+    pr_info("wait for migrate local\n");
     // second step
     {
         unique_lock<mutex> lck(ved->mtx2);
         while(ved->migrateflag != MIGRATELOCALF) ved->cv2.wait(lck);
         if(ved->migrateflag == MIGRATELOCALF)
         {
-            printf("begin local migrate");
+            pr_info("begin local migrate");
         }
     }
     struct scale localbuf;
@@ -809,7 +821,7 @@ int migrate_func(void * arg)
     ret = ved->StoreLocalBuf(&localbuf);
     if(ret < 0)
     {
-        printf("store localbuf error\n");
+        pr_info("store localbuf error\n");
         close(ved->migratefd);
         return -1;
     }
@@ -818,30 +830,35 @@ int migrate_func(void * arg)
     //dh.len = sizeof(localbuf);
     dh.len = locallen;
     ret = key_pair_send(ved->migratefd, &dh, sizeof(dh));
-    ret = key_pair_send(ved->migratefd, localbuff, dh.len);
+    char * p = localbuff;
+    for(int i = 0; i < dh.len; i = i + 1024)
+    {
+        ret = key_pair_send(ved->migratefd, p, 1024);
+        //p = p + 1024;
+    }
     memset(&dh, 0, sizeof(dh));
-    printf("wait for migrate local ack\n");
+    pr_info("wait for migrate local ack\n");
     ret = key_pair_recv(ved->migratefd, &dh, sizeof(dh));
     if(dh.cmd != MIGRATE_LOCAL_SUCCESS)
     {
-        printf("migrate local error\n");
+        pr_info("migrate local error\n");
         return -1;
 
     }
-    printf("sent local\n");
+    pr_info("sent local\n");
     {
         unique_lock<mutex> lck(ved->mtx);
         ved->migratefinish = MIGRATELOCALF;
         ved->cv.notify_all();
     }
-    printf("wait for migtate fin\n");
+    pr_info("wait for migtate fin\n");
     // third step
     {
         unique_lock<mutex> lck(ved->mtx2);
         while(ved->migrateflag != MIGRATEFINF)
             ved->cv2.wait(lck);
         if(ved->migrateflag == MIGRATEFINF)
-            printf("begin migrate fin\n");
+            pr_info("begin migrate fin\n");
     }
     dh.cmd = MIGRATEFIN;
     dh.len = 0;
@@ -850,22 +867,22 @@ int migrate_func(void * arg)
     ret = key_pair_recv(ved->migratefd, &dh, sizeof(dh));
     if(dh.cmd != MIGRATE_FIN_SUCCESS)
     {
-        printf("migtate fin error\n");
+        pr_info("migtate fin error\n");
         return -1;
     }
-    printf("migrate fin success \n");
+    pr_info("migrate fin success \n");
     {
         unique_lock<mutex> lck(ved->mtx);
         ved->migratefinish = MIGRATEFINF;
         ved->cv.notify_all();
     }
-    printf("migrate vedcard successfully\n");
+    pr_info("migrate vedcard successfully\n");
     return 0; 
 }
 int migratekey(void * arg)
 {
         VedInstance * ved = (VedInstance *)arg;
-        printf("%s\n", __func__);
+        pr_info("%s\n", __func__);
         ved->migrateThread = new thread(bind(migrate_func, ved));
         {
             unique_lock<mutex> lck(ved->mtx2);
@@ -876,7 +893,7 @@ int migratekey(void * arg)
         while(ved->migratefinish != MIGRATEKEYF)
             ved->cv.wait(lck);
  
-        printf("send\n");
+        pr_info("send\n");
         if(ved->migratefinish == MIGRATEKEYF)
             return 0;
         else
@@ -891,7 +908,7 @@ int MigrateLocal(void *arg)
         unique_lock<mutex> lck(ved->mtx);
         if(ved->migratefinish != MIGRATEKEYF)
         {
-            printf("key have't migrated\n");
+            pr_info("key have't migrated\n");
             return -1;
         }
     }
@@ -899,7 +916,7 @@ int MigrateLocal(void *arg)
         unique_lock<mutex> lck(ved->mtx2);
         if(ved->migrateflag != MIGRATEKEYF)
         {
-            printf("migrate step error\n");
+            pr_info("migrate step error\n");
             return -1;
         }
         ved->migrateflag = MIGRATELOCALF;
@@ -910,7 +927,7 @@ int MigrateLocal(void *arg)
         ved->cv.wait(lck);
     if(ved->migratefinish != MIGRATELOCALF)
     {
-        printf("migrate local error\n");
+        pr_info("migrate local error\n");
         return -1;
     }
     return 0;
@@ -923,7 +940,7 @@ int MigrateFin(VedInstance * ved)
         unique_lock<mutex> lck(ved->mtx);
         if(ved->migratefinish != MIGRATELOCALF)
         {
-            printf("local have't migrated\n");
+            pr_info("local have't migrated\n");
             return -1;
         }
     }
@@ -931,7 +948,7 @@ int MigrateFin(VedInstance * ved)
         unique_lock<mutex> lck(ved->mtx2);
         if(ved->migrateflag != MIGRATELOCALF)
         {
-            printf("migrate step error\n");
+            pr_info("migrate step error\n");
             return -1;
         }
         ved->migrateflag = MIGRATEFINF;
@@ -942,7 +959,7 @@ int MigrateFin(VedInstance * ved)
         ved->cv.wait(lck);
     if(ved->migratefinish != MIGRATEFINF)
     {
-        printf("migrate fin error\n");
+        pr_info("migrate fin error\n");
         return -1;
     }
     return 0;
@@ -950,7 +967,7 @@ int MigrateFin(VedInstance * ved)
 }
 int migrated(int sockfd)
 {
-    printf("%s\n",__func__);
+    pr_info("%s\n",__func__);
     VedInstance * ved = new VedInstance();
     ved->migratedfd = sockfd;
     ved->migrateThread = new thread(bind(migrated_fuc, ved));
@@ -971,20 +988,20 @@ main(int argc, char * argv[])
     int i = 0;
     if(argc != 2)
     {
-        printf("argument error\n");
+        pr_info("argument error\n");
         return -1;
     }
     locallen =  atoi(argv[1]);
     epollfd = epoll_create(MAX_EPOLL_FD);
 	if(epollfd == -1)
 	{
-		printf("create epoll_create error\n");
+		pr_info("create epoll_create error\n");
 		return -1;
 	}
     int unixfd = syn_daemon_udp_domain_server(vedManagerPath);
     if(unixfd  <= 1)
     {
-        printf("create unix protocol error\n");
+        pr_info("create unix protocol error\n");
         return -1;
     }
     memset(&event, 0, sizeof(event));
@@ -994,7 +1011,7 @@ main(int argc, char * argv[])
     int listenfd = init_tcp_listenfd(localhost, dpPort);
     if(listenfd < 0)
     {
-        printf("create listenfd fo migrate error\n");
+        pr_info("create listenfd fo migrate error\n");
         return -1;
     }
     memset(&event, 0, sizeof(event));
@@ -1003,7 +1020,7 @@ main(int argc, char * argv[])
     epoll_ctl(epollfd, EPOLL_CTL_ADD, listenfd, &event);
     while(true)
     {
-        printf("wait....\n");
+        pr_info("wait....\n");
         nready = epoll_wait(epollfd, events, MAX_EPOLL_EVENT, -1);
         for(i = 0; i < nready; i ++)
         {
@@ -1012,8 +1029,8 @@ main(int argc, char * argv[])
                 memset(&cliaddr, 0, sizeof(cliaddr));
                 memset(&cmd, 0, sizeof(cmd));
                 ret = recvfrom(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, &clilen);
-                printf("ret= %d %d, %s \n", ret ,clilen, cliaddr.sun_path);
-                printf("cmd.vmName:%s\n", cmd.vmName);
+                pr_info("ret= %d %d, %s \n", ret ,clilen, cliaddr.sun_path);
+                pr_info("cmd.vmName:%s\n", cmd.vmName);
                 switch(cmd.cmd)
                 {
                     case CREATEVED:
@@ -1024,10 +1041,10 @@ main(int argc, char * argv[])
                         if(ret == 0)
                         {
                             cmd.cmd = ACTOK;
-                            printf("ok\n");
-                            printf("%s, %d\n", cliaddr.sun_path, (int)clilen);
+                            pr_info("ok\n");
+                            pr_info("%s, %d\n", cliaddr.sun_path, (int)clilen);
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr*)&cliaddr, clilen);
-                            printf("ret:%d %s\n", ret, strerror(errno));
+                            pr_info("ret:%d %s\n", ret, strerror(errno));
                             continue;
                         }
                         else
@@ -1045,14 +1062,14 @@ main(int argc, char * argv[])
                         ret = DestroyVed(cmd.vmName);
                         if(ret == 0)
                         {
-                            printf("destroy %s success\n", cmd.vmName);
+                            pr_info("destroy %s success\n", cmd.vmName);
                             cmd.cmd = ACTOK;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
                         }
                         else
                         {
-                            printf("destroy %s failed\n", cmd.vmName);
+                            pr_info("destroy %s failed\n", cmd.vmName);
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
@@ -1068,16 +1085,16 @@ main(int argc, char * argv[])
                         ved = vedManager.GetInstance(cmd.vmName);
                         if(ved == NULL)
                         {
-                            printf("vm not allocate a virtual card\n");
+                            pr_info("vm not allocate a virtual card\n");
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
                         }
-                        printf("cmd.dpName:%s, dpPort:%s\n", cmd.dpName, dpPort);
+                        pr_info("cmd.dpName:%s, dpPort:%s\n", cmd.dpName, dpPort);
                         ved->migratefd = init_tcp_connect(cmd.dpName, dpPort);
                         if(ved->migratefd < 0)
                         {
-                            printf("connect dp error\n");
+                            pr_info("connect dp error\n");
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
@@ -1085,29 +1102,29 @@ main(int argc, char * argv[])
                         ret = migratekey(ved);
                         if(ret != 0)
                         {
-                            printf("import key error\n");
+                            pr_info("import key error\n");
                             
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
 
                         }
-                        printf("ret:%d\n", ret);
+                        pr_info("ret:%d\n", ret);
                         cmd.cmd = ACTOK;
                         ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                         break;
                     }
                     case IMPORTKEY:
                     {
-                        printf("cmd.vmName:%s\n", cmd.vmName);
+                        pr_info("cmd.vmName:%s\n", cmd.vmName);
                         ret = KeysGetandImport(cmd.vmName);
                         memset(&cmd, 0, sizeof(cmd));
                         if(ret == 0)
                         {
-                            printf("import successly\n");
+                            pr_info("import successly\n");
                             cmd.cmd = ACTOK;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr*)&cliaddr, clilen);
-                            printf("ret = %d, %s\n", ret, strerror(errno));
+                            pr_info("ret = %d, %s\n", ret, strerror(errno));
                             continue;
                         }
                         else
@@ -1121,11 +1138,11 @@ main(int argc, char * argv[])
                     }
                     case MIGRATELOCAL:
                     {
-                        printf("cmd.vmName:%s\n", cmd.vmName);
+                        pr_info("cmd.vmName:%s\n", cmd.vmName);
                         VedInstance * ved = vedManager.GetInstance(cmd.vmName);
                         if(ved == NULL)
                         {
-                            printf("vmName not allocate vm card\n");
+                            pr_info("vmName not allocate vm card\n");
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
@@ -1134,24 +1151,24 @@ main(int argc, char * argv[])
                         ret = MigrateLocal(ved);
                         if(ret != 0)
                         {
-                            printf("migratelocal error\n");
+                            pr_info("migratelocal error\n");
                             
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
                         }
-                        printf("migrate local success\n");
+                        pr_info("migrate local success\n");
                         cmd.cmd = ACTOK;
                         ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                         break;
                     }
                     case MIGRATEFIN:
                     {
-                        printf("cmd.vmName:%s\n", cmd.vmName);
+                        pr_info("cmd.vmName:%s\n", cmd.vmName);
                         VedInstance * ved = vedManager.GetInstance(cmd.vmName);
                         if(ved == NULL)
                         {
-                            printf("vmName not allocate a vm card\n");
+                            pr_info("vmName not allocate a vm card\n");
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
@@ -1159,19 +1176,19 @@ main(int argc, char * argv[])
                         ret = MigrateFin(ved);
                         if(ret != 0)
                         {
-                            printf("migrate fin error\n");
+                            pr_info("migrate fin error\n");
                             cmd.cmd = ACTERROR;
                             ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr *)&cliaddr, clilen);
                             continue;
                         }
-                        printf("migrate fin success\n");
+                        pr_info("migrate fin success\n");
                         cmd.cmd = ACTOK;
                         ret = sendto(unixfd, &cmd, sizeof(cmd), 0, (struct sockaddr*)&cliaddr, clilen);
                         break; 
                     }
                     default:
                     {
-                        printf("recv error command\n");
+                        pr_info("recv error command\n");
                         break;
                     }
 
@@ -1180,11 +1197,11 @@ main(int argc, char * argv[])
             if(events[i].data.fd == listenfd)
             {
                 // prepare fo migrating
-                printf("migrate req\n");
+                pr_info("migrate req\n");
                 int sockfd = accept(listenfd, NULL, NULL);
                 if(sockfd < 0)
                 {
-                    printf("accept error\n");
+                    pr_info("accept error\n");
                     close(sockfd);
                     continue;
                 }

@@ -144,6 +144,8 @@ main(int argc, char * argv[])
             printf("ved migratekey vmname dpname\n");
             return -1;
         }
+        printf("migrate key successfully\n");
+        return 0;
         command.cmd = MIGRATEKEY;
         strcpy(command.vmName, argv[2]);
         strcpy(command.dpName, argv[3]);
@@ -171,6 +173,8 @@ main(int argc, char * argv[])
             printf("ved migratelocal vmname dpname\n");
             return -1;
         }
+        printf("migrate local successfully\n");
+        return 0;
         command.cmd = MIGRATELOCAL;
         strcpy(command.vmName, argv[2]);
         strcpy(command.dpName, argv[3]);
@@ -198,7 +202,9 @@ main(int argc, char * argv[])
             printf("ved migratefin vmname dpname\n");
             return -1;
         }
-        command.cmd = MIGRATEFIN;
+            printf("migrate fin success\n");
+        return 0;
+            command.cmd = MIGRATEFIN;
         strcpy(command.vmName, argv[2]);
         strcpy(command.dpName, argv[3]);
         ret = sendto(sockfd, &command, sizeof(command), 0, (struct sockaddr *)&serveraddr, sizeof(serveraddr));

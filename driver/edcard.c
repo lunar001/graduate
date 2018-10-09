@@ -136,6 +136,7 @@ long edcarddev_ioctl(struct file * filep, unsigned int cmd, unsigned long arg)
         {
             edcardL->keys =  localscal->keys;
             localscal->retcode = 0;
+            printk("import keys successfully\n");
             break;
         }
         case MIGRATE_BEGIN:
@@ -143,6 +144,7 @@ long edcarddev_ioctl(struct file * filep, unsigned int cmd, unsigned long arg)
             // suspend the edthread;
             edcardL->suspend = 1;
             localscal->retcode = 0;
+            printk("migrate begin success\n");
             break;
         }
 
@@ -156,6 +158,7 @@ long edcarddev_ioctl(struct file * filep, unsigned int cmd, unsigned long arg)
             copy_from_user(edcardL->outputbuf, localscal->outputbuf, localscal->len);
             mutex_unlock(&edcardL->locallock);
             localscal->retcode = 0;
+            printk("MIGRATE_IMPORT SUCCESS\n");
             break;
 
         }
@@ -169,6 +172,7 @@ long edcarddev_ioctl(struct file * filep, unsigned int cmd, unsigned long arg)
             copy_to_user(localscal->outputbuf, edcardL->outputbuf, edcardL->len);
             mutex_unlock(&edcardL->locallock);
             localscal->retcode = 0;
+            printk("MIGRATE_EXPORT SUCCESS\n");
             break;
         }
         case MIGRATE_END:
@@ -176,6 +180,7 @@ long edcarddev_ioctl(struct file * filep, unsigned int cmd, unsigned long arg)
             edcardL->suspend = 0;
             localscal->retcode = 0;
             wake_up(&edcardL->edwait);
+            printk("migrate_end success\n");
             break;
         }
 
